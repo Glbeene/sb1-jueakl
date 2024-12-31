@@ -1,4 +1,5 @@
 ---
+import { isSupabaseReady } from '../lib/supabase/client';
 ---
 <form id="contactForm" class="space-y-6">
   <div>
@@ -35,15 +36,21 @@
     <button
       type="submit"
       class="w-full bg-primary text-white px-6 py-3 rounded-md hover:bg-gray-800 transition shadow-lg"
+      disabled={!isSupabaseReady}
     >
-      Send Message
+      {isSupabaseReady ? 'Send Message' : 'Database Not Connected'}
     </button>
   </div>
+  {!isSupabaseReady && (
+    <div class="text-amber-600 bg-amber-50 p-4 rounded-md text-center">
+      Please connect to Supabase using the "Connect to Supabase" button
+    </div>
+  )}
   <div id="formStatus" class="hidden text-center p-4 rounded-md"></div>
 </form>
 
 <script>
-  import { supabase } from '../lib/supabase/client';
+  import { supabase, isSupabaseReady } from '../lib/supabase/client';
 
   const form = document.getElementById('contactForm') as HTMLFormElement;
   const statusDiv = document.getElementById('formStatus');
@@ -52,31 +59,28 @@
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
       
+      if (!isSupabaseReady) {
+        statusDiv.textContent = 'Database is not connected. Please connect to Supabase first.';
+        statusDiv.className = 'text-amber-600 bg-amber-50 p-4 rounded-md';
+        statusDiv.classList.remove('hidden');
+        return;
+      }
+
       try {
         const formData = new FormData(form);
-        const data = {
-          name: formData.get('name') as string,
-          email: formData.get('email') as string,
-          message: formData.get('message') as string
-        };
-
-        // Disable form while submitting
+        
         const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
         submitButton.disabled = true;
         submitButton.textContent = 'Sending...';
 
-        // Insert directly using Supabase client
-        const { error } = await supabase
-          .from('messages')
-          .insert([{
-            name: data.name,
-            email: data.email,
-            message: data.message
-          }]);
+        const { error } = await supabase.from('messages').insert({
+          name: formData.get('name') as string,
+          email: formData.get('email') as string,
+          message: formData.get('message') as string
+        });
 
         if (error) throw error;
 
-        // Show success message
         statusDiv.textContent = 'Message sent successfully!';
         statusDiv.className = 'text-green-600 bg-green-50 p-4 rounded-md';
         statusDiv.classList.remove('hidden');
@@ -90,7 +94,7 @@
       } finally {
         const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
         submitButton.disabled = false;
-        submitButton.textContent = 'Send Message';
+        submitButton.textContent = isSupabaseReady ? 'Send Message' : 'Database Not Connected';
       }
     });
   }
